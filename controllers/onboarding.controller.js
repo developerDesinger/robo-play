@@ -4,8 +4,17 @@ let methods = {
   // Get onboarding data for the authenticated user
   getOnboarding: async (req, res) => {
     try {
-      // Get the most recent onboarding data
-      const onboarding = await OnBoarding.findOne().sort({ createdAt: -1 });
+      let onboarding;
+      
+      // First try to get user-specific onboarding if userId is available
+      if (req.token && req.token._id) {
+        onboarding = await OnBoarding.findOne({ userId: req.token._id });
+      }
+      
+      // If no user-specific onboarding found, get the most recent one
+      if (!onboarding) {
+        onboarding = await OnBoarding.findOne().sort({ createdAt: -1 });
+      }
 
       if (!onboarding) {
         return res.status(404).json({
@@ -32,6 +41,11 @@ let methods = {
   createOnboarding: async (req, res) => {
     try {
       const onboardingData = req.body;
+      
+      // Add userId if available from token
+      if (req.token && req.token._id) {
+        onboardingData.userId = req.token._id;
+      }
 
       // Set default values
       const newOnboardingData = {
@@ -78,10 +92,21 @@ let methods = {
         updateData.status = "Completed";
       }
 
+      let query = {};
+      let options = { new: true, runValidators: true };
+
+      // First try to update user-specific onboarding if userId is available
+      if (req.token && req.token._id) {
+        query.userId = req.token._id;
+      } else {
+        // If no userId, update the most recent onboarding
+        options.sort = { createdAt: -1 };
+      }
+
       const onboarding = await OnBoarding.findOneAndUpdate(
-        {},
+        query,
         updateData,
-        { new: true, runValidators: true, sort: { createdAt: -1 } }
+        options
       );
 
       if (!onboarding) {
@@ -109,14 +134,25 @@ let methods = {
   // Mark onboarding as completed
   completeOnboarding: async (req, res) => {
     try {
+      let query = {};
+      let options = { new: true, runValidators: true };
+
+      // First try to complete user-specific onboarding if userId is available
+      if (req.token && req.token._id) {
+        query.userId = req.token._id;
+      } else {
+        // If no userId, complete the most recent onboarding
+        options.sort = { createdAt: -1 };
+      }
+
       const onboarding = await OnBoarding.findOneAndUpdate(
-        {},
+        query,
         {
           isCompleted: true,
           completedAt: new Date(),
           status: "Completed"
         },
-        { new: true, runValidators: true, sort: { createdAt: -1 } }
+        options
       );
 
       if (!onboarding) {
@@ -144,15 +180,26 @@ let methods = {
   // Skip onboarding
   skipOnboarding: async (req, res) => {
     try {
+      let query = {};
+      let options = { new: true, runValidators: true };
+
+      // First try to skip user-specific onboarding if userId is available
+      if (req.token && req.token._id) {
+        query.userId = req.token._id;
+      } else {
+        // If no userId, skip the most recent onboarding
+        options.sort = { createdAt: -1 };
+      }
+
       const onboarding = await OnBoarding.findOneAndUpdate(
-        {},
+        query,
         {
           skipped: true,
           isCompleted: true,
           completedAt: new Date(),
           status: "Abandoned"
         },
-        { new: true, runValidators: true, sort: { createdAt: -1 } }
+        options
       );
 
       if (!onboarding) {

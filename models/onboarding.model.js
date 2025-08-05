@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const onboardingSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
     activeCard: { type: Number, default: 1 },
     firstName: { type: String, trim: true, minlength: 2, maxlength: 50 },
     lastName: { type: String, trim: true, minlength: 2, maxlength: 50 },
@@ -51,6 +56,7 @@ onboardingSchema.virtual("fullName").get(function () {
   return null;
 });
 
+onboardingSchema.index({ userId: 1 });
 onboardingSchema.index({ status: 1 });
 onboardingSchema.index({ isCompleted: 1 });
 
