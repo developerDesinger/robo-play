@@ -4,27 +4,30 @@ const onboardingController = require("../controllers/onboarding.controller");
 const authPolicy = require("../utils/auth.policy");
 
 // Get onboarding data for the authenticated user
-router.get("/", authPolicy, onboardingController.getOnboarding);
+router.get("/",  onboardingController.getOnboarding);
+
+// Create new onboarding data
+router.post("/", onboardingController.createOnboarding);
 
 // Update onboarding data
-router.patch("/", authPolicy, onboardingController.updateOnboarding);
+router.patch("/",  onboardingController.updateOnboarding);
 
 // Mark onboarding as completed
-router.post("/complete", authPolicy, onboardingController.completeOnboarding);
+router.post("/complete", onboardingController.completeOnboarding);
 
 // Skip onboarding
-router.post("/skip", authPolicy, onboardingController.skipOnboarding);
+router.post("/skip", onboardingController.skipOnboarding);
 
 // Delete onboarding (admin only)
-router.delete("/:userId", authPolicy, onboardingController.deleteOnboarding);
+router.delete("/:id",  onboardingController.deleteOnboarding);
 
 // Get all onboardings (admin only)
-router.get("/all", authPolicy, onboardingController.getAllOnboardings);
+router.get("/all",  onboardingController.getAllOnboardings);
 
 // Get onboarding statistics (admin only)
 router.get("/stats", authPolicy, onboardingController.getOnboardingStats);
 
 // Reset onboarding for a user (admin only)
-router.post("/reset", authPolicy, onboardingController.resetOnboarding);
+router.post("/reset", onboardingController.resetOnboarding);
 
 module.exports = router; 

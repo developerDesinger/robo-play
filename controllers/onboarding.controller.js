@@ -4,9 +4,8 @@ let methods = {
   // Get onboarding data for the authenticated user
   getOnboarding: async (req, res) => {
     try {
-      const userId = req.token._id;
-
-      const onboarding = await OnBoarding.findOne({ userId });
+      // Get the most recent onboarding data
+      const onboarding = await OnBoarding.findOne().sort({ createdAt: -1 });
 
       if (!onboarding) {
         return res.status(404).json({
@@ -29,14 +28,46 @@ let methods = {
     }
   },
 
+  // Create new onboarding data
+  createOnboarding: async (req, res) => {
+    try {
+      const onboardingData = req.body;
+
+      // Set default values
+      const newOnboardingData = {
+        ...onboardingData,
+        activeCard: onboardingData.activeCard || 1,
+        viewed: onboardingData.viewed || false,
+        skipped: onboardingData.skipped || false,
+        isCompleted: onboardingData.isCompleted || false,
+        status: onboardingData.status || "In Progress"
+      };
+
+      // Create new onboarding
+      const onboarding = new OnBoarding(newOnboardingData);
+      await onboarding.save();
+
+      return res.status(201).json({
+        onboarding,
+        msg: "Onboarding created successfully",
+        success: true
+      });
+    } catch (error) {
+      console.error("Error creating onboarding:", error);
+      return res.status(500).json({
+        msg: "Failed to create onboarding",
+        error: error.message || "Something went wrong.",
+        success: false
+      });
+    }
+  },
+
   // Update onboarding data
   updateOnboarding: async (req, res) => {
     try {
-      const userId = req.token._id;
       const updateData = req.body;
 
       // Remove any fields that shouldn't be updated directly
-      delete updateData.userId;
       delete updateData._id;
       delete updateData.createdAt;
       delete updateData.updatedAt;
@@ -48,9 +79,9 @@ let methods = {
       }
 
       const onboarding = await OnBoarding.findOneAndUpdate(
-        { userId },
+        {},
         updateData,
-        { new: true, runValidators: true }
+        { new: true, runValidators: true, sort: { createdAt: -1 } }
       );
 
       if (!onboarding) {
@@ -78,16 +109,14 @@ let methods = {
   // Mark onboarding as completed
   completeOnboarding: async (req, res) => {
     try {
-      const userId = req.token._id;
-
       const onboarding = await OnBoarding.findOneAndUpdate(
-        { userId },
+        {},
         {
           isCompleted: true,
           completedAt: new Date(),
           status: "Completed"
         },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true, sort: { createdAt: -1 } }
       );
 
       if (!onboarding) {
@@ -115,17 +144,15 @@ let methods = {
   // Skip onboarding
   skipOnboarding: async (req, res) => {
     try {
-      const userId = req.token._id;
-
       const onboarding = await OnBoarding.findOneAndUpdate(
-        { userId },
+        {},
         {
           skipped: true,
           isCompleted: true,
           completedAt: new Date(),
           status: "Abandoned"
         },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true, sort: { createdAt: -1 } }
       );
 
       if (!onboarding) {
@@ -153,7 +180,7 @@ let methods = {
   // Delete onboarding (admin only)
   deleteOnboarding: async (req, res) => {
     try {
-      const { userId } = req.params;
+      const { id } = req.params;
 
       // Check if user is admin (you may need to adjust this based on your auth system)
       if (!req.token.isAdmin) {
@@ -163,7 +190,7 @@ let methods = {
         });
       }
 
-      const onboarding = await OnBoarding.findOneAndDelete({ userId });
+      const onboarding = await OnBoarding.findByIdAndDelete(id);
 
       if (!onboarding) {
         return res.status(404).json({
@@ -275,7 +302,7 @@ let methods = {
   // Reset onboarding for a user (admin only)
   resetOnboarding: async (req, res) => {
     try {
-      const { userId } = req.body;
+      const { id } = req.body;
 
       // Check if user is admin
       if (!req.token.isAdmin) {
@@ -285,15 +312,15 @@ let methods = {
         });
       }
 
-      if (!userId) {
+      if (!id) {
         return res.status(400).json({
-          msg: "User ID is required",
+          msg: "Onboarding ID is required",
           success: false
         });
       }
 
-      const onboarding = await OnBoarding.findOneAndUpdate(
-        { userId },
+      const onboarding = await OnBoarding.findByIdAndUpdate(
+        id,
         {
           activeCard: 1,
           status: "In Progress",
