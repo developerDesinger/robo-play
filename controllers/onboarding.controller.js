@@ -5,12 +5,12 @@ let methods = {
   getOnboarding: async (req, res) => {
     try {
       let onboarding;
-      
+
       // First try to get user-specific onboarding if userId is available
       if (req.token && req.token._id) {
         onboarding = await OnBoarding.findOne({ userId: req.token._id });
       }
-      
+
       // If no user-specific onboarding found, get the most recent one
       if (!onboarding) {
         onboarding = await OnBoarding.findOne().sort({ createdAt: -1 });
@@ -19,20 +19,20 @@ let methods = {
       if (!onboarding) {
         return res.status(404).json({
           msg: "Onboarding data not found",
-          success: false
+          success: false,
         });
       }
 
       return res.status(200).json({
         onboarding,
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error fetching onboarding:", error);
       return res.status(500).json({
         msg: "Failed to fetch onboarding data",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
@@ -41,7 +41,7 @@ let methods = {
   createOnboarding: async (req, res) => {
     try {
       const onboardingData = req.body;
-      
+
       // Add userId if available from token
       if (req.token && req.token._id) {
         onboardingData.userId = req.token._id;
@@ -54,7 +54,7 @@ let methods = {
         viewed: onboardingData.viewed || false,
         skipped: onboardingData.skipped || false,
         isCompleted: onboardingData.isCompleted || false,
-        status: onboardingData.status || "In Progress"
+        status: onboardingData.status || "In Progress",
       };
 
       // Create new onboarding
@@ -64,14 +64,14 @@ let methods = {
       return res.status(201).json({
         onboarding,
         msg: "Onboarding created successfully",
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error creating onboarding:", error);
       return res.status(500).json({
         msg: "Failed to create onboarding",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
@@ -112,21 +112,21 @@ let methods = {
       if (!onboarding) {
         return res.status(404).json({
           msg: "Onboarding data not found",
-          success: false
+          success: false,
         });
       }
 
       return res.status(200).json({
         onboarding,
         msg: "Onboarding updated successfully",
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error updating onboarding:", error);
       return res.status(500).json({
         msg: "Failed to update onboarding",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
@@ -150,7 +150,7 @@ let methods = {
         {
           isCompleted: true,
           completedAt: new Date(),
-          status: "Completed"
+          status: "Completed",
         },
         options
       );
@@ -158,21 +158,21 @@ let methods = {
       if (!onboarding) {
         return res.status(404).json({
           msg: "Onboarding data not found",
-          success: false
+          success: false,
         });
       }
 
       return res.status(200).json({
         onboarding,
         msg: "Onboarding completed successfully",
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error completing onboarding:", error);
       return res.status(500).json({
         msg: "Failed to complete onboarding",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
@@ -197,7 +197,7 @@ let methods = {
           skipped: true,
           isCompleted: true,
           completedAt: new Date(),
-          status: "Abandoned"
+          status: "Abandoned",
         },
         options
       );
@@ -205,21 +205,21 @@ let methods = {
       if (!onboarding) {
         return res.status(404).json({
           msg: "Onboarding data not found",
-          success: false
+          success: false,
         });
       }
 
       return res.status(200).json({
         onboarding,
         msg: "Onboarding skipped successfully",
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error skipping onboarding:", error);
       return res.status(500).json({
         msg: "Failed to skip onboarding",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
@@ -233,7 +233,7 @@ let methods = {
       if (!req.token.isAdmin) {
         return res.status(403).json({
           msg: "Access denied. Admin privileges required.",
-          success: false
+          success: false,
         });
       }
 
@@ -242,34 +242,32 @@ let methods = {
       if (!onboarding) {
         return res.status(404).json({
           msg: "Onboarding data not found",
-          success: false
+          success: false,
         });
       }
 
       return res.status(200).json({
         msg: "Onboarding deleted successfully",
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error deleting onboarding:", error);
       return res.status(500).json({
         msg: "Failed to delete onboarding",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
 
-  // Get all onboardings (admin only)
   getAllOnboardings: async (req, res) => {
     try {
-      // Check if user is admin
-      if (!req.token.isAdmin) {
-        return res.status(403).json({
-          msg: "Access denied. Admin privileges required.",
-          success: false
-        });
-      }
+      // if (!req.token.isAdmin) {
+      //   return res.status(403).json({
+      //     msg: "Access denied. Admin privileges required.",
+      //     success: false,
+      //   });
+      // }
 
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
@@ -288,16 +286,16 @@ let methods = {
           currentPage: page,
           totalPages: Math.ceil(total / limit),
           totalItems: total,
-          itemsPerPage: limit
+          itemsPerPage: limit,
         },
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error fetching all onboardings:", error);
       return res.status(500).json({
         msg: "Failed to fetch onboardings",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
@@ -309,7 +307,7 @@ let methods = {
       if (!req.token.isAdmin) {
         return res.status(403).json({
           msg: "Access denied. Admin privileges required.",
-          success: false
+          success: false,
         });
       }
 
@@ -317,14 +315,18 @@ let methods = {
         {
           $group: {
             _id: "$status",
-            count: { $sum: 1 }
-          }
-        }
+            count: { $sum: 1 },
+          },
+        },
       ]);
 
       const totalOnboardings = await OnBoarding.countDocuments();
-      const completedOnboardings = await OnBoarding.countDocuments({ isCompleted: true });
-      const skippedOnboardings = await OnBoarding.countDocuments({ skipped: true });
+      const completedOnboardings = await OnBoarding.countDocuments({
+        isCompleted: true,
+      });
+      const skippedOnboardings = await OnBoarding.countDocuments({
+        skipped: true,
+      });
 
       return res.status(200).json({
         stats: {
@@ -332,16 +334,16 @@ let methods = {
           completed: completedOnboardings,
           skipped: skippedOnboardings,
           inProgress: totalOnboardings - completedOnboardings,
-          statusBreakdown: stats
+          statusBreakdown: stats,
         },
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error fetching onboarding stats:", error);
       return res.status(500).json({
         msg: "Failed to fetch onboarding statistics",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
   },
@@ -355,14 +357,14 @@ let methods = {
       if (!req.token.isAdmin) {
         return res.status(403).json({
           msg: "Access denied. Admin privileges required.",
-          success: false
+          success: false,
         });
       }
 
       if (!id) {
         return res.status(400).json({
           msg: "Onboarding ID is required",
-          success: false
+          success: false,
         });
       }
 
@@ -374,7 +376,7 @@ let methods = {
           isCompleted: false,
           viewed: false,
           skipped: false,
-          completedAt: null
+          completedAt: null,
         },
         { new: true, runValidators: true }
       );
@@ -382,24 +384,24 @@ let methods = {
       if (!onboarding) {
         return res.status(404).json({
           msg: "Onboarding data not found",
-          success: false
+          success: false,
         });
       }
 
       return res.status(200).json({
         onboarding,
         msg: "Onboarding reset successfully",
-        success: true
+        success: true,
       });
     } catch (error) {
       console.error("Error resetting onboarding:", error);
       return res.status(500).json({
         msg: "Failed to reset onboarding",
         error: error.message || "Something went wrong.",
-        success: false
+        success: false,
       });
     }
-  }
+  },
 };
 
-module.exports = methods; 
+module.exports = methods;
