@@ -5,7 +5,7 @@ const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/dbConfig");
 const Router = require("./routes/index");
-const subscriptionController = require("./controllers/subscription.controller"); // Import webhook handler
+const subscriptionController = require("./controllers/subscription.controller");
 require("./trialCheckCron"); // or the correct path
 
 const app = express();
@@ -17,6 +17,7 @@ const allowedOrigins = [
   "https://staging.robo-apply.com",
   "https://staging.roboapply.co",
   "https://roboapply-admin-panel.vercel.app",
+  "https://admin.roboapply.co",
 ];
 
 const corsOptions = {
