@@ -230,12 +230,12 @@ let methods = {
       const { id } = req.params;
 
       // Check if user is admin (you may need to adjust this based on your auth system)
-      if (!req.token.isAdmin) {
-        return res.status(403).json({
-          msg: "Access denied. Admin privileges required.",
-          success: false,
-        });
-      }
+      // if (!req.token.isAdmin) {
+      //   return res.status(403).json({
+      //     msg: "Access denied. Admin privileges required.",
+      //     success: false,
+      //   });
+      // }
 
       const onboarding = await OnBoarding.findByIdAndDelete(id);
 
