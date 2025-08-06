@@ -16,7 +16,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "https://staging.robo-apply.com",
   "https://staging.roboapply.co",
-  "https://roboplay-admin-panel.vercel.app",
+  "https://roboapply-admin-panel.vercel.app",
 ];
 
 const corsOptions = {
