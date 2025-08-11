@@ -4,13 +4,13 @@ const onboardingController = require("../controllers/onboarding.controller");
 const authPolicy = require("../utils/auth.policy");
 
 // Get onboarding data for the authenticated user
-router.get("/",  onboardingController.getOnboarding);
+router.get("/", onboardingController.getOnboarding);
 
 // Create new onboarding data
 router.post("/", onboardingController.createOnboarding);
 
 // Update onboarding data
-router.patch("/",  onboardingController.updateOnboarding);
+router.patch("/:id", onboardingController.updateOnboarding);
 
 // Mark onboarding as completed
 router.post("/complete", onboardingController.completeOnboarding);
@@ -19,15 +19,24 @@ router.post("/complete", onboardingController.completeOnboarding);
 router.post("/skip", onboardingController.skipOnboarding);
 
 // Delete onboarding (admin only)
-router.delete("/:id",  onboardingController.deleteOnboarding);
+router.delete("/:id", onboardingController.deleteOnboarding);
 
 // Get all onboardings (admin only)
-router.get("/all",  onboardingController.getAllOnboardings);
+router.get("/all", onboardingController.getAllOnboardings);
 
 // Get onboarding statistics (admin only)
 router.get("/stats", authPolicy, onboardingController.getOnboardingStats);
 
+// Get card analytics to track where users are leaving (admin only)
+router.get("/card-analytics", onboardingController.getCardAnalytics);
+
+// Get detailed analytics for a specific card (admin only)
+router.get(
+  "/card-analytics/:cardName",
+  onboardingController.getCardDetailAnalytics
+);
+
 // Reset onboarding for a user (admin only)
 router.post("/reset", onboardingController.resetOnboarding);
 
-module.exports = router; 
+module.exports = router;

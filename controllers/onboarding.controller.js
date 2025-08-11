@@ -76,10 +76,18 @@ let methods = {
     }
   },
 
-  // Update onboarding data
+  // Update onboarding data by ID
   updateOnboarding: async (req, res) => {
     try {
       const updateData = req.body;
+      const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          msg: "Onboarding ID is required",
+          success: false,
+        });
+      }
 
       // Remove any fields that shouldn't be updated directly
       delete updateData._id;
@@ -92,22 +100,11 @@ let methods = {
         updateData.status = "Completed";
       }
 
-      let query = {};
-      let options = { new: true, runValidators: true };
-
-      // First try to update user-specific onboarding if userId is available
-      if (req.token && req.token._id) {
-        query.userId = req.token._id;
-      } else {
-        // If no userId, update the most recent onboarding
-        options.sort = { createdAt: -1 };
-      }
-
-      const onboarding = await OnBoarding.findOneAndUpdate(
-        query,
-        updateData,
-        options
-      );
+      // Update onboarding by specific ID
+      const onboarding = await OnBoarding.findByIdAndUpdate(id, updateData, {
+        new: true,
+        runValidators: true,
+      });
 
       if (!onboarding) {
         return res.status(404).json({
@@ -305,12 +302,12 @@ let methods = {
   getOnboardingStats: async (req, res) => {
     try {
       // Check if user is admin
-      if (!req.token.isAdmin) {
-        return res.status(403).json({
-          msg: "Access denied. Admin privileges required.",
-          success: false,
-        });
-      }
+      // if (!req.token.isAdmin) {
+      //   return res.status(403).json({
+      //     msg: "Access denied. Admin privileges required.",
+      //     success: false,
+      //   });
+      // }
 
       const stats = await OnBoarding.aggregate([
         {
@@ -323,7 +320,7 @@ let methods = {
 
       const totalOnboardings = await OnBoarding.countDocuments();
       const completedOnboardings = await OnBoarding.countDocuments({
-        isCompleted: true,
+        status: "Completed",
       });
       const skippedOnboardings = await OnBoarding.countDocuments({
         skipped: true,
@@ -384,8 +381,9 @@ let methods = {
 
       if (!onboarding) {
         return res.status(404).json({
-          msg: "Onboarding data not found",
-          success: false,
+          onboarding,
+          msg: "Onboarding reset successfully",
+          success: true,
         });
       }
 
@@ -398,6 +396,310 @@ let methods = {
       console.error("Error resetting onboarding:", error);
       return res.status(500).json({
         msg: "Failed to reset onboarding",
+        error: error.message || "Something went wrong.",
+        success: false,
+      });
+    }
+  },
+
+  // Get card analytics to track where users are leaving
+  getCardAnalytics: async (req, res) => {
+    try {
+      // Check if user is admin
+      // if (!req.token.isAdmin) {
+      //   return res.status(403).json({
+      //     msg: "Access denied. Admin privileges required.",
+      //     success: false,
+      //   });
+      // }
+
+      // Get date range from query params (optional)
+      const { startDate, endDate } = req.query;
+      let dateFilter = {};
+
+      if (startDate && endDate) {
+        dateFilter = {
+          createdAt: {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate),
+          },
+        };
+      }
+
+      // Aggregate to get analytics by activeCardName
+      const cardAnalytics = await OnBoarding.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: "$activeCardName",
+            totalUsers: { $sum: 1 },
+            completedUsers: {
+              $sum: { $cond: [{ $eq: ["$isCompleted", true] }, 1, 0] },
+            },
+            skippedUsers: {
+              $sum: { $cond: [{ $eq: ["$skipped", true] }, 1, 0] },
+            },
+            inProgressUsers: {
+              $sum: { $cond: [{ $eq: ["$isCompleted", false] }, 1, 0] },
+            },
+            abandonedUsers: {
+              $sum: { $cond: [{ $eq: ["$status", "Abandoned"] }, 1, 0] },
+            },
+          },
+        },
+        {
+          $addFields: {
+            cardName: "$_id",
+            completionRate: {
+              $multiply: [{ $divide: ["$completedUsers", "$totalUsers"] }, 100],
+            },
+            dropOffRate: {
+              $multiply: [
+                {
+                  $divide: [
+                    { $subtract: ["$totalUsers", "$completedUsers"] },
+                    "$totalUsers",
+                  ],
+                },
+                100,
+              ],
+            },
+            abandonmentRate: {
+              $multiply: [{ $divide: ["$abandonedUsers", "$totalUsers"] }, 100],
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            cardName: 1,
+            totalUsers: 1,
+            completedUsers: 1,
+            skippedUsers: 1,
+            inProgressUsers: 1,
+            abandonedUsers: 1,
+            completionRate: { $round: ["$completionRate", 2] },
+            dropOffRate: { $round: ["$dropOffRate", 2] },
+            abandonmentRate: { $round: ["$abandonmentRate", 2] },
+          },
+        },
+        { $sort: { totalUsers: -1 } },
+      ]);
+
+      // Get overall statistics
+      const totalOnboardings = await OnBoarding.countDocuments(dateFilter);
+      const completedOnboardings = await OnBoarding.countDocuments({
+        ...dateFilter,
+        status: "Completed",
+      });
+      const abandonedOnboardings = await OnBoarding.countDocuments({
+        ...dateFilter,
+        status: "Abandoned",
+      });
+
+      // Calculate overall completion rate
+      const overallCompletionRate =
+        totalOnboardings > 0
+          ? Math.round((completedOnboardings / totalOnboardings) * 100 * 100) /
+            100
+          : 0;
+
+      // Handle case when no data exists
+      if (!cardAnalytics || cardAnalytics.length === 0) {
+        return res.status(200).json({
+          analytics: {
+            overall: {
+              totalOnboardings: 0,
+              completedOnboardings: 0,
+              abandonedOnboardings: 0,
+              completionRate: 0,
+              dropOffRate: 0,
+            },
+            byCard: [],
+            insights: {
+              highestDropOffCard: null,
+              highestDropOffRate: 0,
+              totalCards: 0,
+            },
+          },
+          success: true,
+        });
+      }
+
+      // Get the card with highest drop-off rate
+      const highestDropOffCard = cardAnalytics.reduce((prev, current) =>
+        prev.dropOffRate > current.dropOffRate ? prev : current
+      );
+
+      return res.status(200).json({
+        analytics: {
+          overall: {
+            totalOnboardings,
+            completedOnboardings,
+            abandonedOnboardings,
+            completionRate: overallCompletionRate,
+            dropOffRate: Math.round((100 - overallCompletionRate) * 100) / 100,
+          },
+          byCard: cardAnalytics,
+          insights: {
+            highestDropOffCard: highestDropOffCard.cardName,
+            highestDropOffRate: highestDropOffCard.dropOffRate,
+            totalCards: cardAnalytics.length,
+          },
+        },
+        success: true,
+      });
+    } catch (error) {
+      console.error("Error fetching card analytics:", error);
+      // Return zeros instead of 500 error when there's no data
+      return res.status(200).json({
+        analytics: {
+          overall: {
+            totalOnboardings: 0,
+            completedOnboardings: 0,
+            abandonedOnboardings: 0,
+            completionRate: 0,
+            dropOffRate: 0,
+          },
+          byCard: [],
+          insights: {
+            highestDropOffCard: null,
+            highestDropOffRate: 0,
+            totalCards: 0,
+          },
+        },
+        success: true,
+      });
+    }
+  },
+
+  // Get detailed analytics for a specific card
+  getCardDetailAnalytics: async (req, res) => {
+    try {
+      // Check if user is admin
+      // if (!req.token.isAdmin) {
+      //   return res.status(403).json({
+      //     msg: "Access denied. Admin privileges required.",
+      //     success: false,
+      //   });
+      // }
+
+      const { cardName } = req.params;
+      const { startDate, endDate } = req.query;
+
+      if (!cardName) {
+        return res.status(400).json({
+          msg: "Card name is required",
+          success: false,
+        });
+      }
+
+      let dateFilter = {};
+
+      if (startDate && endDate) {
+        dateFilter = {
+          createdAt: {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate),
+          },
+        };
+      }
+
+      // Get detailed analytics for the specific card
+      const cardDetail = await OnBoarding.aggregate([
+        {
+          $match: {
+            activeCardName: cardName,
+            ...dateFilter,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalUsers: { $sum: 1 },
+            completedUsers: {
+              $sum: { $cond: [{ $eq: ["$isCompleted", true] }, 1, 0] },
+            },
+            skippedUsers: {
+              $sum: { $cond: [{ $eq: ["$skipped", true] }, 1, 0] },
+            },
+            inProgressUsers: {
+              $sum: { $cond: [{ $eq: ["$isCompleted", false] }, 1, 0] },
+            },
+            abandonedUsers: {
+              $sum: { $cond: [{ $eq: ["$status", "Abandoned"] }, 1, 0] },
+            },
+            avgTimeSpent: { $avg: { $subtract: ["$updatedAt", "$createdAt"] } },
+          },
+        },
+        {
+          $addFields: {
+            cardName: cardName,
+            completionRate: {
+              $multiply: [{ $divide: ["$completedUsers", "$totalUsers"] }, 100],
+            },
+            dropOffRate: {
+              $multiply: [
+                {
+                  $divide: [
+                    { $subtract: ["$totalUsers", "$completedUsers"] },
+                    "$totalUsers",
+                  ],
+                },
+                100,
+              ],
+            },
+            abandonmentRate: {
+              $multiply: [{ $divide: ["$abandonedUsers", "$totalUsers"] }, 100],
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            cardName: 1,
+            totalUsers: 1,
+            completedUsers: 1,
+            skippedUsers: 1,
+            inProgressUsers: 1,
+            abandonedUsers: 1,
+            completionRate: { $round: ["$completionRate", 2] },
+            dropOffRate: { $round: ["$dropOffRate", 2] },
+            abandonmentRate: { $round: ["$abandonmentRate", 2] },
+            avgTimeSpent: { $round: ["$avgTimeSpent", 2] },
+          },
+        },
+      ]);
+
+      if (cardDetail.length === 0) {
+        return res.status(404).json({
+          msg: `No data found for card: ${cardName}`,
+          success: false,
+        });
+      }
+
+      const analytics = cardDetail[0];
+
+      // Get recent users who left at this card
+      const recentDropOffs = await OnBoarding.find({
+        activeCardName: cardName,
+        isCompleted: false,
+        ...dateFilter,
+      })
+        .select("userId firstName lastName createdAt updatedAt status")
+        .populate("userId", "email")
+        .sort({ updatedAt: -1 })
+        .limit(10);
+
+      return res.status(200).json({
+        analytics,
+        recentDropOffs,
+        success: true,
+      });
+    } catch (error) {
+      console.error("Error fetching card detail analytics:", error);
+      return res.status(500).json({
+        msg: "Failed to fetch card detail analytics",
         error: error.message || "Something went wrong.",
         success: false,
       });

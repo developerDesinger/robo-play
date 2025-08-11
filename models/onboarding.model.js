@@ -8,6 +8,7 @@ const onboardingSchema = new mongoose.Schema(
       required: false,
     },
     activeCard: { type: Number, default: 1 },
+    activeCardName: { type: String, default: "nameInfo" },
     firstName: { type: String, trim: true, minlength: 2, maxlength: 50 },
     lastName: { type: String, trim: true, minlength: 2, maxlength: 50 },
     jobSearchStatus: { type: String },
@@ -31,7 +32,7 @@ const onboardingSchema = new mongoose.Schema(
     selectedBlockers: [{ type: String, trim: true }],
     viewed: { type: Boolean, default: false },
     selectedGoal: { type: String, trim: true },
-    jobsPerWeek: { type: Number, min: 1, max: 100 },
+    jobsPerWeek: { type: Number, min: 0, max: 100 },
     referralCode: { type: String, trim: true },
     skipped: { type: Boolean, default: false },
     isCompleted: { type: Boolean, default: false },
@@ -59,6 +60,7 @@ onboardingSchema.virtual("fullName").get(function () {
 onboardingSchema.index({ userId: 1 });
 onboardingSchema.index({ status: 1 });
 onboardingSchema.index({ isCompleted: 1 });
+onboardingSchema.index({ activeCardName: 1 });
 
 const OnBoarding = mongoose.model("OnBoarding", onboardingSchema);
 module.exports = OnBoarding;
