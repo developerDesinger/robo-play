@@ -274,6 +274,7 @@ let methods = {
       const skip = (page - 1) * limit;
 
       const onboardings = await OnBoarding.find()
+        .populate("userId") // Populate user data with specific fields
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);

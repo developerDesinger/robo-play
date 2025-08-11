@@ -4,7 +4,7 @@ const onboardingSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "user",
       required: false,
     },
     activeCard: { type: Number, default: 1 },
@@ -61,4 +61,4 @@ onboardingSchema.index({ status: 1 });
 onboardingSchema.index({ isCompleted: 1 });
 
 const OnBoarding = mongoose.model("OnBoarding", onboardingSchema);
-module.exports = OnBoarding; 
+module.exports = OnBoarding;
