@@ -59,11 +59,13 @@ app.use((req, res, next) => {
 // Super simple CORS - allow everything
 app.use(
   cors({
-    origin: "*",
-    credentials: false,
-    methods: "*",
-    allowedHeaders: "*",
-    exposedHeaders: "*",
+    origin: true, // Allow all origins
+    credentials: true, // Allow credentials
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['*'], // Allow all headers
+    exposedHeaders: ['*'], // Expose all headers
+    preflightContinue: false,
+    optionsSuccessStatus: 200
   })
 );
 
@@ -72,6 +74,15 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "*");
   res.header("Access-Control-Allow-Headers", "*");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Max-Age", "86400"); // 24 hours
+  
+  // Handle preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
   next();
 });
 app.use(compression());
