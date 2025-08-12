@@ -99,6 +99,25 @@ app.use(express.json()); // ✅ Regular JSON parsing for other routes
 app.use(upload());
 app.use("/api", Router);
 
+// Test endpoint to verify CORS is working
+app.get('/test', (req, res) => {
+  res.status(200).json({
+    message: 'CORS test successful!',
+    timestamp: new Date().toISOString(),
+    requestInfo: {
+      method: req.method,
+      url: req.url,
+      origin: req.headers.origin || 'No origin',
+      userAgent: req.headers['user-agent'] || 'No user agent',
+      host: req.headers.host || 'No host'
+    },
+    serverInfo: {
+      environment: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 3001
+    }
+  });
+});
+
 const port = process.env.PORT || 3001;
 const env = process.env.NODE_ENV;
 
