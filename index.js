@@ -53,6 +53,28 @@ app.use((req, res, next) => {
     originalSend.call(this, data);
   };
 
+  // Add error handling for the response
+  const originalJson = res.json;
+  res.json = function (data) {
+    const duration = Date.now() - start;
+    console.log(
+      `✅ [${new Date().toISOString()}] ${req.method} ${req.url} - ${
+        res.statusCode
+      } (${duration}ms)`
+    );
+    console.log(
+      `📤 Response:`,
+      typeof data === "string" ? data : JSON.stringify(data, null, 2)
+    );
+    console.log(
+      `📊 Response Headers:`,
+      JSON.stringify(res.getHeaders(), null, 2)
+    );
+    console.log("─".repeat(80));
+
+    originalJson.call(this, data);
+  };
+
   next();
 });
 
@@ -69,24 +91,37 @@ app.use(
   })
 );
 
-// Simple fallback for any CORS issues
+// Additional CORS debugging and fallback
 app.use((req, res, next) => {
+  // Log CORS-related headers for debugging
+  if (req.method === 'OPTIONS') {
+    console.log('🔍 CORS Preflight Request Detected');
+    console.log('📋 Request Method:', req.headers['access-control-request-method']);
+    console.log('📋 Request Headers:', req.headers['access-control-request-headers']);
+  }
+  
+  // Ensure CORS headers are set
   res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
   res.header("Access-Control-Allow-Headers", "*");
   res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Max-Age", "86400"); // 24 hours
+  res.header("Access-Control-Max-Age", "86400");
   
-  // Handle preflight requests immediately
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('✅ CORS Preflight handled successfully');
     res.status(200).end();
     return;
   }
   
   next();
 });
+
 app.use(compression());
 app.use(cookieParser());
+
+// Move JSON parsing before routes to ensure it works for all requests
+app.use(express.json()); // ✅ Regular JSON parsing for other routes
 
 // Removde the stripe webhook route from here, it's moved to stripe.route.js
 app.post(
@@ -95,7 +130,6 @@ app.post(
   subscriptionController.handleWebhook
 );
 
-app.use(express.json()); // ✅ Regular JSON parsing for other routes
 app.use(upload());
 app.use("/api", Router);
 
@@ -107,6 +141,26 @@ app.get('/test', (req, res) => {
     requestInfo: {
       method: req.method,
       url: req.url,
+      origin: req.headers.origin || 'No origin',
+      userAgent: req.headers['user-agent'] || 'No user agent',
+      host: req.headers.host || 'No host'
+    },
+    serverInfo: {
+      environment: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 3001
+    }
+  });
+});
+
+// Test PATCH endpoint to verify PATCH requests work
+app.patch('/test-patch', (req, res) => {
+  res.status(200).json({
+    message: 'PATCH request successful!',
+    timestamp: new Date().toISOString(),
+    requestInfo: {
+      method: req.method,
+      url: req.url,
+      body: req.body,
       origin: req.headers.origin || 'No origin',
       userAgent: req.headers['user-agent'] || 'No user agent',
       host: req.headers.host || 'No host'

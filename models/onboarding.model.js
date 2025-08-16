@@ -13,7 +13,7 @@ const onboardingSchema = new mongoose.Schema(
     lastName: { type: String, trim: true, minlength: 2, maxlength: 50 },
     jobSearchStatus: { type: String },
     challenges: [{ type: String, trim: true }],
-    hearAboutUs: { type: String, trim: true },
+    hearAboutUs: [{ type: String, trim: true }],
     employmentStatus: { type: String, trim: true },
     jobTitle: { type: String, trim: true },
     salary: { type: Number, min: 0 },
