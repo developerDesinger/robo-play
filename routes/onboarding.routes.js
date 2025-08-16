@@ -6,6 +6,9 @@ const authPolicy = require("../utils/auth.policy");
 // Get onboarding data for the authenticated user
 router.get("/", onboardingController.getOnboarding);
 
+// Get onboarding data by ID
+router.get("/:id", onboardingController.getOnboardingById);
+
 // Create new onboarding data
 router.post("/", onboardingController.createOnboarding);
 

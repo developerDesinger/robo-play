@@ -37,6 +37,41 @@ let methods = {
     }
   },
 
+  // Get onboarding data by ID
+  getOnboardingById: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          msg: "Onboarding ID is required",
+          success: false,
+        });
+      }
+
+      const onboarding = await OnBoarding.findById(id);
+
+      if (!onboarding) {
+        return res.status(404).json({
+          msg: "Onboarding data not found",
+          success: false,
+        });
+      }
+
+      return res.status(200).json({
+        onboarding,
+        success: true,
+      });
+    } catch (error) {
+      console.error("Error fetching onboarding by ID:", error);
+      return res.status(500).json({
+        msg: "Failed to fetch onboarding data",
+        error: error.message || "Something went wrong.",
+        success: false,
+      });
+    }
+  },
+
   // Create new onboarding data
   createOnboarding: async (req, res) => {
     try {
