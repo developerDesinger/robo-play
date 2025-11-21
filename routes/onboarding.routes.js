@@ -21,6 +21,9 @@ router.get(
   onboardingController.getCardDetailAnalytics
 );
 
+// Get analytics for countries and traffic sources
+router.get("/analytics", onboardingController.getAnalytics);
+
 // Get onboarding data by ID
 router.get("/:id", onboardingController.getOnboardingById);
 

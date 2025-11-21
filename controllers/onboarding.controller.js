@@ -740,6 +740,174 @@ let methods = {
       });
     }
   },
+
+  // Get analytics for countries and traffic sources
+  getAnalytics: async (req, res) => {
+    try {
+      // Get total users count
+      const totalUsers = await OnBoarding.countDocuments();
+
+      // Country aggregation - using the country field with fallback to userId.country
+      const countryStats = await OnBoarding.aggregate([
+        {
+          $lookup: {
+            from: "users",
+            localField: "userId",
+            foreignField: "_id",
+            as: "userData",
+          },
+        },
+        {
+          $project: {
+            country: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $ne: ["$country", null] },
+                    { $ne: ["$country", ""] },
+                    { $ne: [{ $trim: { input: "$country" } }, ""] },
+                  ],
+                },
+                then: { $trim: { input: "$country" } },
+                else: {
+                  $cond: {
+                    if: {
+                      $and: [
+                        { $gt: [{ $size: "$userData" }, 0] },
+                        {
+                          $ne: [
+                            { $arrayElemAt: ["$userData.country", 0] },
+                            null,
+                          ],
+                        },
+                        {
+                          $ne: [{ $arrayElemAt: ["$userData.country", 0] }, ""],
+                        },
+                        {
+                          $ne: [
+                            {
+                              $trim: {
+                                input: {
+                                  $arrayElemAt: ["$userData.country", 0],
+                                },
+                              },
+                            },
+                            "",
+                          ],
+                        },
+                      ],
+                    },
+                    then: {
+                      $trim: {
+                        input: { $arrayElemAt: ["$userData.country", 0] },
+                      },
+                    },
+                    else: "Unknown",
+                  },
+                },
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$country",
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+        {
+          $project: {
+            country: "$_id",
+            count: 1,
+            _id: 0,
+          },
+        },
+      ]);
+
+      // Traffic source aggregation - handle both array and string formats
+      const trafficSourceStats = await OnBoarding.aggregate([
+        // Match documents that have hearAboutUs field
+        { $match: { hearAboutUs: { $exists: true, $ne: null } } },
+        // Convert to array format if it's a string, or keep as array
+        {
+          $project: {
+            sources: {
+              $cond: {
+                if: { $isArray: "$hearAboutUs" },
+                then: "$hearAboutUs",
+                else: ["$hearAboutUs"],
+              },
+            },
+          },
+        },
+        { $unwind: "$sources" },
+        // Filter out null, empty strings, and trim whitespace
+        {
+          $match: {
+            sources: { $ne: null, $exists: true },
+          },
+        },
+        {
+          $project: {
+            trimmedSource: { $trim: { input: "$sources" } },
+          },
+        },
+        {
+          $match: {
+            trimmedSource: { $ne: "" },
+          },
+        },
+        {
+          $group: {
+            _id: "$trimmedSource",
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+        {
+          $project: {
+            source: "$_id",
+            count: 1,
+            _id: 0,
+          },
+        },
+      ]);
+
+      // Format countries array
+      const countries = countryStats.map((item) => ({
+        country: item.country || "Unknown",
+        count: item.count,
+      }));
+
+      // Format traffic sources array
+      const trafficSources = trafficSourceStats.map((item) => ({
+        source: item.source,
+        count: item.count,
+      }));
+
+      // Get timestamp
+      const lastUpdated = new Date().toISOString();
+
+      // Handle edge cases - return empty arrays if no data
+      return res.status(200).json({
+        success: true,
+        analytics: {
+          countries: countries.length > 0 ? countries : [],
+          trafficSources: trafficSources.length > 0 ? trafficSources : [],
+          totalUsers,
+          lastUpdated,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      return res.status(500).json({
+        msg: "Failed to fetch analytics data",
+        error: error.message || "Something went wrong.",
+        success: false,
+      });
+    }
+  },
 };
 
 module.exports = methods;
