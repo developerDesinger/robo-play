@@ -301,16 +301,20 @@ let methods = {
       //   });
       // }
 
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const page = req.query.page ? parseInt(req.query.page) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit) : 10;
       const skip = (page - 1) * limit;
 
-      const onboardings = await OnBoarding.find()
+      let query = OnBoarding.find()
         .populate("userId") // Populate user data with specific fields
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit);
+        .sort({ createdAt: -1 });
 
+      // Apply pagination only if page is explicitly provided in query
+      if (req.query.page) {
+        query = query.skip(skip).limit(limit);
+      }
+
+      const onboardings = await query;
       const total = await OnBoarding.countDocuments();
 
       return res.status(200).json({
