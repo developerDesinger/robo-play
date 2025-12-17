@@ -301,32 +301,115 @@ let methods = {
       //   });
       // }
 
+      const { googleSignup } = req.query;
       const page = req.query.page ? parseInt(req.query.page) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit) : 10;
       const skip = (page - 1) * limit;
 
-      let query = OnBoarding.find()
-        .populate("userId") // Populate user data with specific fields
-        .sort({ createdAt: -1 });
+      // Build filter query for Google signup
+      let filter = {};
 
-      // Apply pagination only if page is explicitly provided in query
-      if (req.query.page) {
-        query = query.skip(skip).limit(limit);
+      if (googleSignup === "google" || googleSignup === "regular") {
+        // Use aggregation when filtering by signup type
+        const matchStage =
+          googleSignup === "google"
+            ? { "userData.imageUrl": { $exists: true, $ne: "", $ne: null } }
+            : {
+                $and: [
+                  {
+                    $or: [
+                      { "userData.imageUrl": { $exists: false } },
+                      { "userData.imageUrl": "" },
+                      { "userData.imageUrl": null },
+                    ],
+                  },
+                ],
+              };
+
+        const pipeline = [
+          {
+            $lookup: {
+              from: "users",
+              localField: "userId",
+              foreignField: "_id",
+              as: "userData",
+            },
+          },
+          { $match: matchStage },
+          { $sort: { createdAt: -1 } },
+        ];
+
+        // Add pagination if page is explicitly provided
+        if (req.query.page) {
+          pipeline.push({ $skip: skip });
+          pipeline.push({ $limit: limit });
+        }
+
+        // Add userId population back
+        pipeline.push({
+          $addFields: {
+            userId: { $arrayElemAt: ["$userData", 0] },
+          },
+        });
+        pipeline.push({
+          $project: {
+            userData: 0,
+          },
+        });
+
+        const onboardings = await OnBoarding.aggregate(pipeline);
+
+        // Get total count with filter
+        const countPipeline = [
+          {
+            $lookup: {
+              from: "users",
+              localField: "userId",
+              foreignField: "_id",
+              as: "userData",
+            },
+          },
+          { $match: matchStage },
+          { $count: "total" },
+        ];
+        const countResult = await OnBoarding.aggregate(countPipeline);
+        const total = countResult.length > 0 ? countResult[0].total : 0;
+
+        return res.status(200).json({
+          onboardings,
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalItems: total,
+            itemsPerPage: limit,
+          },
+          success: true,
+        });
+      } else {
+        // Original logic when no googleSignup filter
+        let query = OnBoarding.find(filter)
+          .populate("userId")
+          .sort({ createdAt: -1 });
+
+        // Apply pagination only if page is explicitly provided in query
+        if (req.query.page) {
+          query = query.skip(skip).limit(limit);
+        }
+
+        const onboardings = await query;
+        const total = await OnBoarding.countDocuments(filter);
+
+        return res.status(200).json({
+          onboardings,
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalItems: total,
+            itemsPerPage: limit,
+          },
+          success: true,
+        });
       }
-
-      const onboardings = await query;
-      const total = await OnBoarding.countDocuments();
-
-      return res.status(200).json({
-        onboardings,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalItems: total,
-          itemsPerPage: limit,
-        },
-        success: true,
-      });
     } catch (error) {
       console.error("Error fetching all onboardings:", error);
       return res.status(500).json({
@@ -748,11 +831,31 @@ let methods = {
   // Get analytics for countries and traffic sources
   getAnalytics: async (req, res) => {
     try {
-      // Get total users count
-      const totalUsers = await OnBoarding.countDocuments();
+      const { googleSignup } = req.query;
+
+      // Build user filter for Google signup
+      let userMatchStage = {};
+      if (googleSignup === "google") {
+        // Filter for users with Google signup (have imageUrl)
+        userMatchStage = {
+          $match: {
+            "userData.imageUrl": { $exists: true, $ne: "" },
+          },
+        };
+      } else if (googleSignup === "regular") {
+        // Filter for users without Google signup
+        userMatchStage = {
+          $match: {
+            $or: [
+              { "userData.imageUrl": { $exists: false } },
+              { "userData.imageUrl": "" },
+            ],
+          },
+        };
+      }
 
       // Country aggregation - using the country field with fallback to userId.country
-      const countryStats = await OnBoarding.aggregate([
+      const countryPipeline = [
         {
           $lookup: {
             from: "users",
@@ -761,6 +864,8 @@ let methods = {
             as: "userData",
           },
         },
+        // Add Google signup filter if specified
+        ...(googleSignup ? [userMatchStage] : []),
         {
           $project: {
             country: {
@@ -827,10 +932,22 @@ let methods = {
             _id: 0,
           },
         },
-      ]);
+      ];
+
+      const countryStats = await OnBoarding.aggregate(countryPipeline);
 
       // Traffic source aggregation - handle both array and string formats
-      const trafficSourceStats = await OnBoarding.aggregate([
+      const trafficSourcePipeline = [
+        {
+          $lookup: {
+            from: "users",
+            localField: "userId",
+            foreignField: "_id",
+            as: "userData",
+          },
+        },
+        // Add Google signup filter if specified
+        ...(googleSignup ? [userMatchStage] : []),
         // Match documents that have hearAboutUs field
         { $match: { hearAboutUs: { $exists: true, $ne: null } } },
         // Convert to array format if it's a string, or keep as array
@@ -876,7 +993,34 @@ let methods = {
             _id: 0,
           },
         },
-      ]);
+      ];
+
+      const trafficSourceStats = await OnBoarding.aggregate(
+        trafficSourcePipeline
+      );
+
+      // Get total users count with filter applied
+      let totalUsers;
+      if (googleSignup) {
+        const totalUsersPipeline = [
+          {
+            $lookup: {
+              from: "users",
+              localField: "userId",
+              foreignField: "_id",
+              as: "userData",
+            },
+          },
+          userMatchStage,
+          {
+            $count: "total",
+          },
+        ];
+        const result = await OnBoarding.aggregate(totalUsersPipeline);
+        totalUsers = result.length > 0 ? result[0].total : 0;
+      } else {
+        totalUsers = await OnBoarding.countDocuments();
+      }
 
       // Format countries array
       const countries = countryStats.map((item) => ({
